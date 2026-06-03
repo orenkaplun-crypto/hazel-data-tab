@@ -1,13 +1,485 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>hazel-data-tab</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chen household — Data Tab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f2f2f0; color: #1a1a1a; }
+
+    /* header */
+    .hdr { padding: 20px 20px 16px; background: #fff; border-bottom: 1px solid #e8e8e6; }
+    .hdr-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .hdr-title { font-size: 22px; font-weight: 700; color: #1B3A5C; line-height: 1.2; }
+    .hdr-sub { font-size: 13px; color: #888; margin-top: 3px; }
+    .completeness-pill { display: flex; align-items: center; gap: 8px; border: 1.5px solid #d4a94a; border-radius: 999px; padding: 6px 14px 6px 10px; flex-shrink: 0; white-space: nowrap; }
+    .completeness-bar-wrap { width: 60px; height: 5px; background: #f0e8d4; border-radius: 3px; overflow: hidden; }
+    .completeness-bar { height: 100%; background: #d4a94a; border-radius: 3px; }
+    .completeness-text { font-size: 12px; font-weight: 600; color: #b8882a; }
+
+    /* layout */
+    .content { padding: 16px 16px 40px; max-width: 700px; margin: 0 auto; }
+
+    /* section card */
+    .section-card { background: #fff; border-radius: 14px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+    .section-hdr { display: flex; align-items: center; gap: 10px; padding: 16px 18px; cursor: pointer; user-select: none; }
+    .section-hdr:hover { background: #fafafa; }
+    .section-icon { font-size: 18px; color: #1B3A5C; flex-shrink: 0; display: flex; align-items: center; }
+    .section-title { font-size: 15px; font-weight: 700; color: #1a1a1a; flex: 1; }
+    .section-badge { font-size: 11px; color: #666; background: #f0f0ee; border-radius: 999px; padding: 3px 9px; font-weight: 500; flex-shrink: 0; }
+    .section-status { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #b45309; background: #fef9ec; border: 1px solid #f5d87a; border-radius: 999px; padding: 3px 9px; flex-shrink: 0; }
+    .section-chevron { color: #bbb; flex-shrink: 0; transition: transform 0.2s ease; display: flex; align-items: center; }
+    .section-chevron.open { transform: rotate(90deg); }
+    .section-body { border-top: 1px solid #f0f0ee; }
+
+    /* tab switcher */
+    .tab-row { display: flex; gap: 8px; padding: 14px 18px 12px; }
+    .tab-btn { padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background 0.15s, color 0.15s; }
+    .tab-btn.active { background: #1B3A5C; color: #fff; }
+    .tab-btn.inactive { background: #f0f0ee; color: #666; }
+
+    /* field rows */
+    .field-row { display: flex; align-items: center; padding: 12px 18px; border-bottom: 1px solid #f4f4f2; gap: 12px; position: relative; }
+    .field-row:last-child { border-bottom: none; }
+    .field-row:hover .field-actions { opacity: 1; }
+    .field-label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; flex: 0 0 160px; }
+    .field-value { font-size: 14px; font-weight: 600; color: #1a1a1a; flex: 1; }
+    .field-value.empty { color: #bbb; font-weight: 400; font-style: italic; }
+    .field-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: #0F6E56; }
+    .dot-amber { background: #f59e0b; }
+    .dot-empty { border: 1.5px solid #ccc; }
+    .field-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+    .icon-btn { width: 26px; height: 26px; border: none; background: transparent; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #bbb; transition: color 0.15s, background 0.15s; }
+    .icon-btn:hover { color: #3b82f6; background: #eff6ff; }
+    .icon-btn.hist-on { color: #3b82f6; background: #eff6ff; }
+
+    /* group label inside section */
+    .group-label { font-size: 10px; font-weight: 700; color: #0F6E56; text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 18px 4px; }
+
+    /* history panel */
+    .hist-panel { overflow: hidden; max-height: 0; transition: max-height 0.3s ease, opacity 0.2s ease; opacity: 0; }
+    .hist-panel.open { max-height: 200px; opacity: 1; }
+    .hist-inner { margin: 0 18px 10px; border-radius: 8px; border: 1px solid #e0eaff; overflow: hidden; background: #f8faff; }
+    .hist-hdr { background: #e8efff; padding: 6px 12px; font-size: 10px; font-weight: 700; color: #4b6cb7; text-transform: uppercase; letter-spacing: 0.06em; }
+    .hist-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .hist-table th { text-align: left; padding: 4px 12px; color: #888; font-weight: 500; }
+    .hist-table td { padding: 5px 12px; color: #444; border-top: 1px solid #e8efff; }
+    .hist-table td:first-child { color: #888; }
+    .src-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #fff; }
+
+    /* dual row */
+    .dual-label { font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 18px 4px; }
+    .dual-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 18px 12px; }
+    .dual-card { border-radius: 10px; padding: 10px 12px; }
+    .dual-card-john { background: #e8f0fb; }
+    .dual-card-cecilia { background: #f0ecfb; }
+    .dual-card-combined { background: #f4f4f2; }
+    .dual-card-name { font-size: 11px; font-weight: 700; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .dual-card-john .dual-card-name { color: #2563eb; }
+    .dual-card-cecilia .dual-card-name { color: #7c3aed; }
+    .dual-card-combined .dual-card-name { color: #888; }
+    .dual-card-val { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+    .dual-card-val.empty { color: #bbb; font-weight: 400; font-style: italic; font-size: 12px; }
+    .dual-card-sub { font-size: 10px; color: #888; margin-top: 2px; }
+
+    /* add field button */
+    .add-field-btn { margin: 8px 18px 14px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #888; border: 1.5px dashed #ccc; border-radius: 999px; padding: 5px 14px; cursor: pointer; background: transparent; transition: color 0.15s, border-color 0.15s; }
+    .add-field-btn:hover { color: #0F6E56; border-color: #0F6E56; }
+
+    /* life event chips */
+    .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 4px 10px; }
+    .chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .chip-recent { background: #e8f7f0; color: #0F6E56; }
+    .chip-recent .chip-dot { background: #0F6E56; }
+    .chip-ongoing { background: #fef9ec; color: #b45309; }
+    .chip-ongoing .chip-dot { background: #f59e0b; }
+    .chip-upcoming { background: #e8eeff; color: #3b5bdb; }
+    .chip-upcoming .chip-dot { background: #4263eb; }
+
+    /* account table */
+    .acct-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .acct-table th { text-align: left; padding: 8px 18px; font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.05em; background: #fafafa; border-bottom: 1px solid #f0f0ee; }
+    .acct-table td { padding: 10px 18px; border-bottom: 1px solid #f4f4f2; color: #333; }
+    .acct-table tr:last-child td { border-bottom: none; }
+    .acct-table td:nth-child(3), .acct-table td:nth-child(4) { font-weight: 600; }
+    .tx-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+    .tx-taxable { background: #fef9ec; color: #b45309; }
+    .tx-deferred { background: #e8eeff; color: #3b5bdb; }
+    .tx-free { background: #e8f7f0; color: #0F6E56; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, createElement: h } = React;
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const fmt = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US');
+const age = dob => { const d = new Date(dob), now = new Date(); let a = now.getFullYear()-d.getFullYear(); if(now<new Date(now.getFullYear(),d.getMonth(),d.getDate()))a--; return a; };
+
+// ── SVG icons ────────────────────────────────────────────────────────────────
+const svg = (paths, size=16) => h('svg',{width:size,height:size,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},
+  ...(Array.isArray(paths)?paths:[paths]).map((d,i)=>h('path',{key:i,d})));
+const IcoChevronRight = () => svg('M9 18l6-6-6-6', 16);
+const IcoEdit = () => svg('M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7', 14);
+const IcoTrash = () => svg(['M3 6h18','M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'], 14);
+const IcoClock = () => h('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},h('circle',{cx:12,cy:12,r:10}),svg('M12 6v6l4 2',14));
+const IcoWarn = () => svg('M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', 12);
+const IcoUser = () => svg(['M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2','M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8'], 18);
+const IcoPeople = () => svg(['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2','M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8','M23 21v-2a4 4 0 0 0-3-3.87','M16 3.13a4 4 0 0 1 0 7.75'], 18);
+const IcoDollar = () => h('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},h('line',{x1:12,y1:1,x2:12,y2:23}),svg('M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',18));
+const IcoHome = () => svg(['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z','M9 22V12h6v10'], 18);
+const IcoBank = () => h('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},h('line',{x1:3,y1:22,x2:21,y2:22}),h('line',{x1:6,y1:18,x2:6,y2:11}),h('line',{x1:10,y1:18,x2:10,y2:11}),h('line',{x1:14,y1:18,x2:14,y2:11}),h('line',{x1:18,y1:18,x2:18,y2:11}),h('polygon',{points:'12 2 20 7 4 7'}));
+const IcoHouse = () => svg('M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 18);
+const IcoShield = () => svg('M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 18);
+const IcoTarget = () => h('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},h('circle',{cx:12,cy:12,r:10}),h('circle',{cx:12,cy:12,r:6}),h('circle',{cx:12,cy:12,r:2}));
+const IcoFile = () => svg(['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z','M14 2v6h6','M16 13H8','M16 17H8','M10 9H8'], 18);
+const IcoScale = () => svg(['M12 3v18','M3 9l9-6 9 6','M3 15h18'], 18);
+const IcoTrend = () => svg(['M23 6l-9.5 9.5-5-5L1 18','M17 6h6v6'], 18);
+const IcoHeart = () => svg('M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z', 18);
+const IcoBriefcase = () => svg(['M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z','M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16'], 18);
+const IcoPlus = () => svg(['M12 5v14','M5 12h14'], 13);
+
+// ── data ─────────────────────────────────────────────────────────────────────
+const HH = {
+  persons: [
+    { id:'john', label:'John Chen', fullName:'John Wei Chen', dob:'1972-03-14', state:'California', city:'', maritalStatus:'Married', marriageDate:'2001-06-12', priorMarriages:false, email:'john.chen@email.com', phone:'(415) 555-0142', address:'2847 Oak Street, San Francisco, CA 94117', healthStatus:'Excellent', smoker:false, citizenship:'US Citizen', employmentStatus:'Full-time employed', income:[{type:'Salary',amount:320000,employer:'TechCorp Inc.',deferral401k:12,match:'100% first 3%'},{type:'Bonus',amount:85000}], ssPIA:2840, ssReceiving:false, rtqScore:6, riskCapacity:'Medium' },
+    { id:'cecilia', label:'Cecilia Chen', fullName:'Cecilia Chen', dob:'1974-07-22', state:'California', city:'', maritalStatus:'Married', marriageDate:'2001-06-12', priorMarriages:false, email:'cecilia.chen@email.com', phone:'(415) 555-0198', address:'2847 Oak Street, San Francisco, CA 94117', healthStatus:'Good', smoker:false, citizenship:'US Citizen', employmentStatus:'Full-time employed', income:[{type:'Salary',amount:145000,employer:'Design Studio LLC',deferral401k:8,match:'50% first 4%'}], ssPIA:1620, ssReceiving:false, rtqScore:4, riskCapacity:'Low' }
+  ],
+  dependents:[
+    {name:'Emma Chen',dob:'2007-08-12',relationship:'Daughter',specialNeeds:false},
+    {name:'Lucas Chen',dob:'2010-03-05',relationship:'Son',specialNeeds:false}
+  ],
+  expenses:{total:null,housing:7200,healthcare:4800,other:null},
+  accounts:[
+    {type:'401(k)',tax:'Tax-deferred',owner:'John',balance:1240000,costBasis:null,beneficiary:'Cecilia Chen'},
+    {type:'401(k)',tax:'Tax-deferred',owner:'Cecilia',balance:380000,costBasis:null,beneficiary:'John Chen'},
+    {type:'Brokerage',tax:'Taxable',owner:'Joint',balance:780000,costBasis:420000,beneficiary:'Emma & Lucas Chen'},
+    {type:'Roth IRA',tax:'Tax-free',owner:'John',balance:95000,costBasis:null,beneficiary:'Cecilia Chen'}
+  ],
+  aumWithFirm:1800000, checkingSavings:285000, emergencyFund:42000,
+  properties:[{useType:'Primary',marketValue:2100000,purchasePrice:980000,mortgage:{balance:620000,rate:3.25,rateType:'Fixed'}}],
+  consumerDebt:[],
+  insurance:{
+    life:[
+      {policyType:'Term',faceAmount:2000000,termExpiry:2031,beneficiary:'Cecilia Chen',person:'John'},
+      {policyType:null,person:'Cecilia'}
+    ],
+    disability:[], ltc:[],
+    healthPlan:{planType:'PPO',oopMax:8000},
+    umbrella:1000000, lastReviewDate:'2022-03-15'
+  },
+  tax:{filingStatus:'Married Filing Jointly',agi:698000,taxYear:2024,itemizing:false,irmaaTier:0,capitalLossCarryover:null},
+  estate:{
+    will:{john:{exists:true,lastUpdated:'2021'},cecilia:{exists:true,lastUpdated:'2021'}},
+    trust:{type:'Revocable living trust',balance:null},
+    directives:{john:{hcAgent:null,poaAgent:null},cecilia:{hcAgent:null,poaAgent:null}},
+    beneficiariesUpToDate:'conflict', annualGiving:12000, dafBalance:null
+  },
+  softFacts:{
+    lifeEvents:[
+      {label:'Job change — John',timing:'recent'},
+      {label:'Care for aging parent',timing:'ongoing'},
+      {label:'Emma starting college — Fall 2026',timing:'upcoming'},
+      {label:'Planned relocation — Florida',timing:'upcoming'}
+    ],
+    specialDates:[
+      {type:'Birthday',person:'John',date:'March 14'},
+      {type:'Birthday',person:'Cecilia',date:'July 22'},
+      {type:'Birthday',person:'Emma',date:'August 12'},
+      {type:'Anniversary',person:'John & Cecilia',date:'June 12'}
+    ],
+    commPrefs:{preferredContact:'Email only — no phone calls',meetingFormat:'John: in-person · Cecilia: video call',sophistication:'High — former CFO background',tone:'Informal, no jargon'},
+    notes:{john:'Golf weekends · coaches youth soccer · Annual Italy trip · considering Portugal 2027 · Risk-averse, values security and leaving inheritance',cecilia:'Prefers detailed analysis before decisions · Strong interest in sustainable investing'}
+  }
+};
+const john = HH.persons[0], cecilia = HH.persons[1];
+
+// ── HistoryPanel ──────────────────────────────────────────────────────────────
+function HistoryPanel({open, currentVal}) {
+  return h('div',{className:`hist-panel ${open?'open':''}`},
+    h('div',{className:'hist-inner'},
+      h('div',{className:'hist-hdr'},'Field History'),
+      h('table',{className:'hist-table'},
+        h('thead',null,h('tr',null,h('th',null,'Date'),h('th',null,'Value'),h('th',null,'Source'))),
+        h('tbody',null,
+          h('tr',null,h('td',null,'2026-05-15'),h('td',{style:{fontWeight:600,color:'#1a1a1a'}},currentVal||'—'),h('td',null,h('span',{className:'src-badge',style:{background:'#0F6E56'}},'Meeting'))),
+          h('tr',null,h('td',null,'2025-11-02'),h('td',null,'—'),h('td',null,h('span',{className:'src-badge',style:{background:'#3b82f6'}},'Form')))
+        )
+      )
+    )
+  );
+}
+
+// ── FieldRow ──────────────────────────────────────────────────────────────────
+function FieldRow({label, value, dot}) {
+  const [histOpen, setHistOpen] = useState(false);
+  const dotClass = value ? (dot==='amber'?'dot-amber':'dot-green') : 'dot-empty';
+  return h('div',null,
+    h('div',{className:'field-row'},
+      h('div',{className:'field-label'},label),
+      h('div',{className:`field-value ${value?'':'empty'}`},value||'—'),
+      h('div',{className:'field-actions'},
+        h('button',{className:'icon-btn',title:'Edit'},h(IcoEdit)),
+        h('button',{className:'icon-btn',title:'Delete'},h(IcoTrash)),
+        h('button',{className:`icon-btn ${histOpen?'hist-on':''}`,title:'History',onClick:()=>setHistOpen(v=>!v)},h(IcoClock))
+      ),
+      h('div',{className:`field-dot ${dotClass}`})
+    ),
+    h(HistoryPanel,{open:histOpen,currentVal:value})
+  );
+}
+
+// ── DualRow ───────────────────────────────────────────────────────────────────
+function DualRow({label, johnVal, ceciliaVal, combinedVal, johnSub, ceciliaSub}) {
+  return h('div',null,
+    h('div',{className:'dual-label'},label),
+    h('div',{className:'dual-grid'},
+      h('div',{className:'dual-card dual-card-john'},
+        h('div',{className:'dual-card-name'},h('span',null,'John'),h('div',{style:{display:'flex',gap:2}},h('button',{className:'icon-btn',style:{width:20,height:20}},h(IcoEdit)),h('button',{className:'icon-btn',style:{width:20,height:20}},h(IcoClock)))),
+        h('div',{className:`dual-card-val ${johnVal?'':'empty'}`},johnVal||'—'),
+        johnSub && h('div',{className:'dual-card-sub'},johnSub)
+      ),
+      h('div',{className:'dual-card dual-card-cecilia'},
+        h('div',{className:'dual-card-name'},h('span',null,'Cecilia'),h('div',{style:{display:'flex',gap:2}},h('button',{className:'icon-btn',style:{width:20,height:20}},h(IcoEdit)),h('button',{className:'icon-btn',style:{width:20,height:20}},h(IcoClock)))),
+        h('div',{className:`dual-card-val ${ceciliaVal?'':'empty'}`},ceciliaVal||'—'),
+        ceciliaSub && h('div',{className:'dual-card-sub'},ceciliaSub)
+      ),
+      h('div',{className:'dual-card dual-card-combined'},
+        h('div',{className:'dual-card-name'},h('span',null,'Combined')),
+        h('div',{className:`dual-card-val ${combinedVal?'':'empty'}`},combinedVal||'—')
+      )
+    )
+  );
+}
+
+// ── Section ───────────────────────────────────────────────────────────────────
+function Section({icon, title, badge, statusBadge, defaultOpen=false, children}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return h('div',{className:'section-card'},
+    h('div',{className:'section-hdr',onClick:()=>setOpen(v=>!v)},
+      h('div',{className:'section-icon'},icon),
+      h('span',{className:'section-title'},title),
+      badge && h('span',{className:'section-badge'},badge),
+      statusBadge && h('span',{className:'section-status'},h(IcoWarn),statusBadge),
+      h('div',{className:`section-chevron ${open?'open':''}`},h(IcoChevronRight))
+    ),
+    open && h('div',{className:'section-body'},children)
+  );
+}
+
+// ── GroupLabel ────────────────────────────────────────────────────────────────
+const GL = ({label}) => h('div',{className:'group-label'},label);
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [profileTab, setProfileTab] = useState('john');
+  const active = profileTab==='john' ? john : cecilia;
+
+  return h('div',null,
+    // header
+    h('div',{className:'hdr'},
+      h('div',{className:'hdr-top'},
+        h('div',null,
+          h('div',{className:'hdr-title'},'Chen household'),
+          h('div',{className:'hdr-sub'},'John Chen · Cecilia Chen · Client since 2020')
+        ),
+        h('div',{className:'completeness-pill'},
+          h('div',{className:'completeness-bar-wrap'},h('div',{className:'completeness-bar',style:{width:'78%'}})),
+          h('span',{className:'completeness-text'},'38 / 49 complete')
+        )
+      )
+    ),
+
+    h('div',{className:'content'},
+
+      // ── 1. Identity ──────────────────────────────────────────────────────
+      h(Section,{icon:h(IcoUser),title:'Identity',badge:'Per person',defaultOpen:true},
+        h('div',{className:'tab-row'},
+          HH.persons.map(p=>h('button',{key:p.id,className:`tab-btn ${profileTab===p.id?'active':'inactive'}`,onClick:()=>setProfileTab(p.id)},p.label))
+        ),
+        h(FieldRow,{label:'Full name',value:active.fullName}),
+        h(FieldRow,{label:'Date of birth',value:`${active.dob} (age ${age(active.dob)})`}),
+        h(FieldRow,{label:'State',value:active.state}),
+        h(FieldRow,{label:'City',value:active.city||null,dot:'amber'}),
+        h(FieldRow,{label:'Marital status',value:active.maritalStatus}),
+        h(FieldRow,{label:'Marriage date',value:active.marriageDate}),
+        h(FieldRow,{label:'Prior marriages',value:active.priorMarriages?'Yes':'No'}),
+        h(FieldRow,{label:'Email',value:active.email}),
+        h(FieldRow,{label:'Phone',value:active.phone}),
+        h(FieldRow,{label:'Address',value:active.address}),
+        h(FieldRow,{label:'Health status',value:active.healthStatus}),
+        h(FieldRow,{label:'Smoker',value:active.smoker?'Yes':'No'}),
+        h(FieldRow,{label:'Citizenship',value:active.citizenship}),
+        h(FieldRow,{label:'Employment',value:active.employmentStatus}),
+        h('button',{className:'add-field-btn'},h(IcoPlus),'Add identity field')
+      ),
+
+      // ── 2. Family & Dependents ───────────────────────────────────────────
+      h(Section,{icon:h(IcoPeople),title:'Family & Dependents',badge:'Household'},
+        HH.dependents.map((dep,i)=>h('div',{key:i},
+          h(GL,{label:`Dependent ${i+1}`}),
+          h(FieldRow,{label:'Name',value:dep.name}),
+          h(FieldRow,{label:'Date of birth',value:`${dep.dob} (age ${age(dep.dob)})`}),
+          h(FieldRow,{label:'Relationship',value:dep.relationship}),
+          h(FieldRow,{label:'Special needs',value:dep.specialNeeds?'Yes':'No'})
+        )),
+        h('button',{className:'add-field-btn'},h(IcoPlus),'Add dependent')
+      ),
+
+      // ── 3. Income ────────────────────────────────────────────────────────
+      h(Section,{icon:h(IcoDollar),title:'Income',badge:'Per person + household'},
+        h(GL,{label:'Salary'}),
+        h(DualRow,{label:'Salary',johnVal:fmt(320000),ceciliaVal:fmt(145000),combinedVal:fmt(465000),johnSub:'TechCorp Inc. · 401k 12%',ceciliaSub:'Design Studio LLC · 401k 8%'}),
+        h(GL,{label:'Bonus'}),
+        h(DualRow,{label:'Bonus',johnVal:fmt(85000),ceciliaVal:null,combinedVal:fmt(85000)}),
+        h(GL,{label:'Social Security — PIA at FRA'}),
+        h(DualRow,{label:'SS PIA',johnVal:`$${john.ssPIA.toLocaleString()}/mo`,ceciliaVal:`$${cecilia.ssPIA.toLocaleString()}/mo`,combinedVal:null}),
+        h(DualRow,{label:'Receiving SS',johnVal:'Not yet',ceciliaVal:'Not yet',combinedVal:null}),
+        h(GL,{label:'Total income'}),
+        h(DualRow,{label:'Total',johnVal:fmt(405000),ceciliaVal:fmt(145000),combinedVal:fmt(550000)})
+      ),
+
+      // ── 4. Expenses ──────────────────────────────────────────────────────
+      h(Section,{icon:h(IcoHome),title:'Expenses',badge:'Household',statusBadge:'Total not entered'},
+        h(GL,{label:'Total annual expenses'}),
+        h(FieldRow,{label:'Total',value:null,dot:'amber'}),
+        h(GL,{label:'Housing'}),
+        h(FieldRow,{label:'Monthly housing',value:'$7,200/mo'}),
+        h(GL,{label:'Healthcare'}),
+        h(FieldRow,{label:'Annual healthcare',value:'$4,800/yr'}),
+        h(GL,{label:'Other'}),
+        h(FieldRow,{label:'Other expenses',value:null})
+      ),
+
+      // ── 5. Accounts & Assets ─────────────────────────────────────────────
+      h(Section,{icon:h(IcoBank),title:'Accounts & Assets',badge:'Household'},
+        h(GL,{label:'Investment accounts'}),
+        h('table',{className:'acct-table'},
+          h('thead',null,h('tr',null,
+            h('th',null,'Type'),h('th',null,'Tax treatment'),h('th',null,'Owner'),h('th',null,'Balance'),h('th',null,'Cost basis'),h('th',null,'Beneficiary')
+          )),
+          h('tbody',null,HH.accounts.map((a,i)=>h('tr',{key:i},
+            h('td',{style:{fontWeight:600}},a.type),
+            h('td',null,h('span',{className:`tx-badge ${a.tax==='Taxable'?'tx-taxable':a.tax==='Tax-deferred'?'tx-deferred':'tx-free'}`},a.tax)),
+            h('td',null,a.owner),
+            h('td',null,fmt(a.balance)),
+            h('td',null,a.costBasis?fmt(a.costBasis):'—'),
+            h('td',null,a.beneficiary)
+          )))
+        ),
+        h(GL,{label:'Liquid cash'}),
+        h(FieldRow,{label:'Checking / Savings',value:fmt(HH.checkingSavings)}),
+        h(FieldRow,{label:'Emergency fund',value:fmt(HH.emergencyFund)}),
+        h(GL,{label:'AUM with firm'}),
+        h(FieldRow,{label:'AUM',value:fmt(HH.aumWithFirm)}),
+        h(GL,{label:'Crypto'}),
+        h(FieldRow,{label:'Crypto holdings',value:null})
+      ),
+
+      // ── 6. Real Estate & Debt ────────────────────────────────────────────
+      h(Section,{icon:h(IcoHouse),title:'Real Estate & Debt',badge:'Per asset + owner'},
+        h(GL,{label:'Primary residence'}),
+        h(FieldRow,{label:'Market value',value:fmt(2100000)}),
+        h(FieldRow,{label:'Purchase price',value:fmt(980000)}),
+        h(GL,{label:'Mortgage'}),
+        h(FieldRow,{label:'Balance',value:fmt(620000)}),
+        h(FieldRow,{label:'Rate',value:'3.25% Fixed'}),
+        h(GL,{label:'Consumer debt'}),
+        h(FieldRow,{label:'Consumer debt',value:'None'})
+      ),
+
+      // ── 7. Retirement & Social Security ─────────────────────────────────
+      h(Section,{icon:h(IcoTarget),title:'Retirement & Social Security',badge:'Per person'},
+        h(GL,{label:'SS — PIA at FRA'}),
+        h(DualRow,{label:'PIA at FRA',johnVal:`$${john.ssPIA.toLocaleString()}/mo`,ceciliaVal:`$${cecilia.ssPIA.toLocaleString()}/mo`,combinedVal:null}),
+        h(GL,{label:'Receiving SS'}),
+        h(DualRow,{label:'Currently receiving',johnVal:'No',ceciliaVal:'No',combinedVal:null}),
+        h(GL,{label:'Military service'}),
+        h(FieldRow,{label:'Military service',value:null})
+      ),
+
+      // ── 8. Tax ───────────────────────────────────────────────────────────
+      h(Section,{icon:h(IcoFile),title:'Tax',badge:'Household'},
+        h(GL,{label:'Filing'}),
+        h(FieldRow,{label:'Filing status',value:'Married Filing Jointly'}),
+        h(FieldRow,{label:'AGI (2024)',value:fmt(698000)}),
+        h(FieldRow,{label:'Deduction method',value:'Standard deduction'}),
+        h(GL,{label:'Other'}),
+        h(FieldRow,{label:'IRMAA tier',value:'Tier 0'}),
+        h(FieldRow,{label:'Capital loss carryover',value:null})
+      ),
+
+      // ── 9. Insurance ─────────────────────────────────────────────────────
+      h(Section,{icon:h(IcoShield),title:'Insurance',badge:'Per person / asset',statusBadge:'Last review 4+ yrs ago'},
+        h(GL,{label:'Life insurance — John'}),
+        h(FieldRow,{label:'Policy type',value:'Term'}),
+        h(FieldRow,{label:'Face amount',value:fmt(2000000)}),
+        h(FieldRow,{label:'Term expiry',value:'2031'}),
+        h(FieldRow,{label:'Beneficiary',value:'Cecilia Chen'}),
+        h(GL,{label:'Life insurance — Cecilia'}),
+        h(FieldRow,{label:'Policy',value:null}),
+        h(GL,{label:'Health plan'}),
+        h(FieldRow,{label:'Plan type',value:'PPO'}),
+        h(FieldRow,{label:'OOP max',value:fmt(8000)}),
+        h(GL,{label:'Umbrella'}),
+        h(FieldRow,{label:'Coverage',value:fmt(1000000)}),
+        h(GL,{label:'Review'}),
+        h(FieldRow,{label:'Last review date',value:'2022-03-15',dot:'amber'})
+      ),
+
+      // ── 10. Estate ───────────────────────────────────────────────────────
+      h(Section,{icon:h(IcoScale),title:'Estate',badge:'Household',statusBadge:'Beneficiary conflict'},
+        h(GL,{label:'Will'}),
+        h(DualRow,{label:'Will exists',johnVal:'Yes (updated 2021)',ceciliaVal:'Yes (updated 2021)',combinedVal:null}),
+        h(GL,{label:'Trust'}),
+        h(FieldRow,{label:'Trust type',value:'Revocable living trust'}),
+        h(FieldRow,{label:'Funded balance',value:null,dot:'amber'}),
+        h(GL,{label:'Directives & POA'}),
+        h(DualRow,{label:'HC directives agent',johnVal:null,ceciliaVal:null}),
+        h(DualRow,{label:'Financial POA agent',johnVal:null,ceciliaVal:null}),
+        h(GL,{label:'Beneficiary designations'}),
+        h(FieldRow,{label:'Up to date?',value:'Conflict detected ⚠️',dot:'amber'}),
+        h(GL,{label:'Charitable giving'}),
+        h(FieldRow,{label:'Annual giving',value:fmt(12000)}),
+        h(FieldRow,{label:'DAF balance',value:null})
+      ),
+
+      // ── 11. Risk Profile ─────────────────────────────────────────────────
+      h(Section,{icon:h(IcoTrend),title:'Risk Profile',badge:'Per person'},
+        h(GL,{label:'Risk tolerance'}),
+        h(DualRow,{label:'RTQ score',johnVal:'6 / 10',ceciliaVal:'4 / 10',combinedVal:null}),
+        h(GL,{label:'Risk capacity'}),
+        h(DualRow,{label:'Capacity',johnVal:'Medium',ceciliaVal:'Low',combinedVal:null})
+      ),
+
+      // ── 12. Soft Facts ───────────────────────────────────────────────────
+      h(Section,{icon:h(IcoHeart),title:'Soft Facts',badge:'Household'},
+        h(GL,{label:'Life events'}),
+        h('div',{style:{padding:'8px 18px 12px',display:'flex',flexWrap:'wrap',gap:6}},
+          HH.softFacts.lifeEvents.map((ev,i)=>h('span',{key:i,className:`chip chip-${ev.timing}`},h('span',{className:'chip-dot'}),ev.label))
+        ),
+        h(GL,{label:'Special dates'}),
+        HH.softFacts.specialDates.map((sd,i)=>h(FieldRow,{key:i,label:`${sd.type} — ${sd.person}`,value:sd.date})),
+        h(GL,{label:'Communication preferences'}),
+        h(FieldRow,{label:'Preferred contact',value:HH.softFacts.commPrefs.preferredContact}),
+        h(FieldRow,{label:'Meeting format',value:HH.softFacts.commPrefs.meetingFormat}),
+        h(FieldRow,{label:'Sophistication',value:HH.softFacts.commPrefs.sophistication}),
+        h(FieldRow,{label:'Tone',value:HH.softFacts.commPrefs.tone}),
+        h(GL,{label:'Notes — John'}),
+        h('div',{style:{padding:'8px 18px 14px',fontSize:13,color:'#444',lineHeight:1.6}},HH.softFacts.notes.john),
+        h(GL,{label:'Notes — Cecilia'}),
+        h('div',{style:{padding:'8px 18px 14px',fontSize:13,color:'#444',lineHeight:1.6}},HH.softFacts.notes.cecilia)
+      )
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
 </html>
